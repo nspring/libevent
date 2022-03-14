@@ -26,6 +26,7 @@ TESTPROGRAMS = \
 	test/test-closed				\
 	test/test-fdleak				\
 	test/test-init				\
+	test/test-huperr				\
 	test/test-ratelim				\
 	test/test-time				\
 	test/test-weof \
@@ -97,6 +98,8 @@ test_test_closed_SOURCES = test/test-closed.c
 test_test_closed_LDADD = libevent_core.la
 test_test_changelist_SOURCES = test/test-changelist.c
 test_test_changelist_LDADD = libevent_core.la
+test_test_huperr_SOURCES = test/test-huperr.c
+test_test_huperr_LDADD = libevent_core.la
 test_test_weof_SOURCES = test/test-weof.c
 test_test_weof_LDADD = libevent_core.la
 test_test_time_SOURCES = test/test-time.c

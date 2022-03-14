@@ -515,7 +515,9 @@ enum event_method_feature {
      * Methods that do support EV_CLOSED may not be able to provide support on
      * all kernel versions.
      **/
-    EV_FEATURE_EARLY_CLOSE = 0x08
+    EV_FEATURE_EARLY_CLOSE = 0x08,
+    /* Require an event method that allows EV_HUP and EV_ERROR */
+    EV_FEATURE_HUP_ERR = 0x10
 };
 
 /**
@@ -966,6 +968,22 @@ int event_base_got_break(struct event_base *eb);
  * feature flag EV_FEATURE_EARLY_CLOSE.
  **/
 #define EV_CLOSED	0x80
+/**
+ * Detects hangup events, where the local endpoint has shutdown for writing 
+ * and will read no more through shutdown for reading or through receiving fin. 
+ * Hangup events are also delivered through EV_READ and EV_WRITE; this allows
+ * them to be subscribed to independently.
+ *
+ **/
+#define EV_HUP		0x100
+/**
+ * Detects error events, where for example the local has tried to send but 
+ * the remote is no longer receiving.
+ * Error events are also delivered through EV_READ and EV_WRITE; this allows
+ * them to be subscribed to independently.
+ *
+ **/
+#define EV_ERROR	0x200
 /**@}*/
 
 /**

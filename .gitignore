@@ -118,6 +118,7 @@ rpcgen-attempted
 test-dumpevents
 test-eof
 test-closed
+test-huperr
 test-init
 test-ratelim
 test-script.sh

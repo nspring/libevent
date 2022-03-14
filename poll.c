@@ -91,7 +91,7 @@ const struct eventop pollops = {
 	poll_dispatch,
 	poll_dealloc,
 	1, /* need_reinit */
-	EV_FEATURE_FDS|EARLY_CLOSE_IF_HAVE_RDHUP,
+	EV_FEATURE_FDS|EARLY_CLOSE_IF_HAVE_RDHUP|EV_FEATURE_HUP_ERR,
 	sizeof(struct pollidx),
 };
 
@@ -217,6 +217,12 @@ poll_dispatch(struct event_base *base, struct timeval *tv)
 			res |= EV_WRITE;
 		if (what & POLLRDHUP)
 			res |= EV_CLOSED;
+		if (what & POLLRDHUP)
+			res |= EV_CLOSED;
+		if (what & POLLHUP)
+			res |= EV_HUP;
+		if (what & POLLERR)
+			res |= EV_ERROR;
 		if (res == 0)
 			continue;
 
@@ -235,7 +241,7 @@ poll_add(struct event_base *base, int fd, short old, short events, void *idx_)
 	int i;
 
 	EVUTIL_ASSERT((events & EV_SIGNAL) == 0);
-	if (!(events & (EV_READ|EV_WRITE|EV_CLOSED)))
+	if (!(events & (EV_READ|EV_WRITE|EV_CLOSED|EV_HUP|EV_ERROR)))
 		return (0);
 
 	poll_check_ok(pop);
@@ -280,6 +286,10 @@ poll_add(struct event_base *base, int fd, short old, short events, void *idx_)
 		pfd->events |= POLLIN;
 	if (events & EV_CLOSED)
 		pfd->events |= POLLRDHUP;
+	if (events & EV_HUP)
+		pfd->events |= POLLHUP;
+	if (events & EV_ERROR)
+		pfd->events |= POLLERR;
 	poll_check_ok(pop);
 
 	return (0);
@@ -298,7 +308,7 @@ poll_del(struct event_base *base, int fd, short old, short events, void *idx_)
 	int i;
 
 	EVUTIL_ASSERT((events & EV_SIGNAL) == 0);
-	if (!(events & (EV_READ|EV_WRITE|EV_CLOSED)))
+	if (!(events & (EV_READ|EV_WRITE|EV_CLOSED|EV_HUP|EV_ERROR)))
 		return (0);
 
 	poll_check_ok(pop);
@@ -314,6 +324,10 @@ poll_del(struct event_base *base, int fd, short old, short events, void *idx_)
 		pfd->events &= ~POLLOUT;
 	if (events & EV_CLOSED)
 		pfd->events &= ~POLLRDHUP;
+	if (events & EV_HUP)
+		pfd->events &= ~POLLHUP;
+	if (events & EV_ERROR)
+		pfd->events &= ~POLLERR;
 	poll_check_ok(pop);
 	if (pfd->events)
 		/* Another event cares about that fd. */

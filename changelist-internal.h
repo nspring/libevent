@@ -63,6 +63,8 @@ struct event_change {
 	ev_uint8_t read_change;
 	ev_uint8_t write_change;
 	ev_uint8_t close_change;
+	ev_uint8_t hup_change;
+	ev_uint8_t error_change;
 };
 
 /* Flags for read_change and write_change. */

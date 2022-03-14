@@ -1672,11 +1672,13 @@ event_process_active_single_queue(struct event_base *base,
 			else
 				event_del_nolock_(ev, EVENT_DEL_NOBLOCK);
 			event_debug((
-			    "event_process_active: event: %p, %s%s%scall %p",
+			    "event_process_active: event: %p, %s%s%s%s%scall %p",
 			    ev,
 			    ev->ev_res & EV_READ ? "EV_READ " : " ",
 			    ev->ev_res & EV_WRITE ? "EV_WRITE " : " ",
 			    ev->ev_res & EV_CLOSED ? "EV_CLOSED " : " ",
+			    ev->ev_res & EV_ERROR ? "EV_ERROR " : " ",
+			    ev->ev_res & EV_HUP ? "EV_HUP " : " ",
 			    ev->ev_callback));
 		} else {
 			event_queue_remove_active(base, evcb);
@@ -2111,7 +2113,7 @@ event_base_once(struct event_base *base, evutil_socket_t fd, short events,
 	eonce->cb = callback;
 	eonce->arg = arg;
 
-	if ((events & (EV_TIMEOUT|EV_SIGNAL|EV_READ|EV_WRITE|EV_CLOSED)) == EV_TIMEOUT) {
+	if ((events & (EV_TIMEOUT|EV_SIGNAL|EV_READ|EV_WRITE|EV_CLOSED|EV_ERROR|EV_HUP)) == EV_TIMEOUT) {
 		evtimer_assign(&eonce->ev, base, event_once_cb, eonce);
 
 		if (tv == NULL || ! evutil_timerisset(tv)) {
@@ -2121,8 +2123,8 @@ event_base_once(struct event_base *base, evutil_socket_t fd, short events,
 			 * it fast (and order-preserving). */
 			activate = 1;
 		}
-	} else if (events & (EV_READ|EV_WRITE|EV_CLOSED)) {
-		events &= EV_READ|EV_WRITE|EV_CLOSED;
+	} else if (events & (EV_READ|EV_WRITE|EV_CLOSED|EV_ERROR|EV_HUP)) {
+		events &= EV_READ|EV_WRITE|EV_CLOSED|EV_ERROR|EV_HUP;
 
 		event_assign(&eonce->ev, base, fd, events, event_once_cb, eonce);
 	} else {
@@ -2174,9 +2176,9 @@ event_assign(struct event *ev, struct event_base *base, evutil_socket_t fd, shor
 	ev->ev_pncalls = NULL;
 
 	if (events & EV_SIGNAL) {
-		if ((events & (EV_READ|EV_WRITE|EV_CLOSED)) != 0) {
+		if ((events & (EV_READ|EV_WRITE|EV_CLOSED|EV_ERROR|EV_HUP)) != 0) {
 			event_warnx("%s: EV_SIGNAL is not compatible with "
-			    "EV_READ, EV_WRITE or EV_CLOSED", __func__);
+			    "EV_READ, EV_WRITE, EV_CLOSED, EV_ERROR, or EV_HUP", __func__);
 			return -1;
 		}
 		ev->ev_closure = EV_CLOSURE_EVENT_SIGNAL;
@@ -2426,13 +2428,13 @@ event_pending(const struct event *ev, short event, struct timeval *tv)
 	event_debug_assert_is_setup_(ev);
 
 	if (ev->ev_flags & EVLIST_INSERTED)
-		flags |= (ev->ev_events & (EV_READ|EV_WRITE|EV_CLOSED|EV_SIGNAL));
+		flags |= (ev->ev_events & (EV_READ|EV_WRITE|EV_CLOSED|EV_ERROR|EV_HUP|EV_SIGNAL));
 	if (ev->ev_flags & (EVLIST_ACTIVE|EVLIST_ACTIVE_LATER))
 		flags |= ev->ev_res;
 	if (ev->ev_flags & EVLIST_TIMEOUT)
 		flags |= EV_TIMEOUT;
 
-	event &= (EV_TIMEOUT|EV_READ|EV_WRITE|EV_CLOSED|EV_SIGNAL);
+	event &= (EV_TIMEOUT|EV_READ|EV_WRITE|EV_CLOSED|EV_ERROR|EV_HUP|EV_SIGNAL);
 
 	/* See if there is a timeout that we should report */
 	if (tv != NULL && (flags & event & EV_TIMEOUT)) {
@@ -2646,12 +2648,14 @@ event_add_nolock_(struct event *ev, const struct timeval *tv,
 	event_debug_assert_is_setup_(ev);
 
 	event_debug((
-		 "event_add: event: %p (fd "EV_SOCK_FMT"), %s%s%s%scall %p",
+		 "event_add: event: %p (fd "EV_SOCK_FMT"), %s%s%s%s%s%scall %p",
 		 ev,
 		 EV_SOCK_ARG(ev->ev_fd),
 		 ev->ev_events & EV_READ ? "EV_READ " : " ",
 		 ev->ev_events & EV_WRITE ? "EV_WRITE " : " ",
 		 ev->ev_events & EV_CLOSED ? "EV_CLOSED " : " ",
+		 ev->ev_events & EV_HUP ? "EV_HUP " : " ",
+		 ev->ev_events & EV_ERROR ? "EV_ERROR " : " ",
 		 tv ? "EV_TIMEOUT " : " ",
 		 ev->ev_callback));
 
@@ -2685,9 +2689,9 @@ event_add_nolock_(struct event *ev, const struct timeval *tv,
 	}
 #endif
 
-	if ((ev->ev_events & (EV_READ|EV_WRITE|EV_CLOSED|EV_SIGNAL)) &&
+	if ((ev->ev_events & (EV_READ|EV_WRITE|EV_CLOSED|EV_HUP|EV_ERROR|EV_SIGNAL)) &&
 	    !(ev->ev_flags & (EVLIST_INSERTED|EVLIST_ACTIVE|EVLIST_ACTIVE_LATER))) {
-		if (ev->ev_events & (EV_READ|EV_WRITE|EV_CLOSED))
+		if (ev->ev_events & (EV_READ|EV_WRITE|EV_CLOSED|EV_HUP|EV_ERROR))
 			res = evmap_io_add_(base, ev->ev_fd, ev);
 		else if (ev->ev_events & EV_SIGNAL)
 			res = evmap_signal_add_(base, (int)ev->ev_fd, ev);
